@@ -1,7 +1,7 @@
 import torch
 import time
 from torch import nn
-from src.net import MLP, CNN, weight_init
+from src.net import MLP, CNN, CNN_LSTM, weight_init
 
 def trainer(config,num_epochs,num_sample_pts, dataloaders,dataset_sizes,model_type, classes, device):
 
@@ -10,13 +10,20 @@ def trainer(config,num_epochs,num_sample_pts, dataloaders,dataset_sizes,model_ty
         model = MLP(config, num_sample_pts, classes).to(device)
     elif model_type == "cnn":
         model = CNN(config, num_sample_pts, classes).to(device)
+    elif model_type == "cnn-lstm":
+        model = CNN_LSTM(config, num_sample_pts, classes).to(device)
     weight_init(model, config['kernel_initializer'])
-    # Creates the optimizer
+    # Creates the optimizer with improved configurations
     lr = config["lr"]
     if config["optimizer"] == "Adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+    elif config["optimizer"] == "AdamW":
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     elif config["optimizer"] == "RMSprop":
-        optimizer = torch.optim.RMSprop(model.parameters(), lr=lr)
+        optimizer = torch.optim.RMSprop(model.parameters(), lr=lr, weight_decay=1e-4)
+    
+    # Add learning rate scheduler for better convergence
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
     # This is the trainning Loop
     criterion = nn.CrossEntropyLoss()
@@ -71,6 +78,11 @@ def trainer(config,num_epochs,num_sample_pts, dataloaders,dataset_sizes,model_ty
             labels.detach()
             # Here we calculate the GE, NTGE and the accuracy over the X_attack traces.
             print('{} Epoch Loss: {:.4f} Epoch Acc: {:.4f}'.format(phase, epoch_loss, epoch_acc))
+            
+            # Step the scheduler on validation loss
+            if phase == 'val':
+                scheduler.step(epoch_loss)
+                
         model.eval()
         # model.to("cpu")
         # if (epoch + 1) % 10 == 0 and epoch != 0:

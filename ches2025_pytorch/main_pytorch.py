@@ -10,16 +10,16 @@ import torch
 
 from torchvision.transforms import transforms
 from src.dataloader import ToTensor_trace, Custom_Dataset
-from src.net import create_hyperparameter_space, MLP, CNN
+from src.net import create_hyperparameter_space, MLP, CNN, CNN_LSTM
 from src.trainer import trainer
 from src.utils import evaluate, AES_Sbox, calculate_HW
 
 if __name__=="__main__":
     dataset = "CHES_2025"
-    model_type = "cnn" #mlp, cnn
+    model_type = "cnn-lstm" #mlp, cnn, cnn-lstm
     leakage = "HW" #ID, HW
     train_models = True
-    num_epochs = 5
+    num_epochs = 20  # Increased epochs for better convergence
     total_num_models = 1
     nb_traces_attacks = 10000
     total_nb_traces_attacks = 10000
@@ -114,6 +114,8 @@ if __name__=="__main__":
                 model = MLP(config, num_sample_pts, classes).to(device)
             elif model_type == "cnn":
                 model = CNN(config, num_sample_pts, classes).to(device)
+            elif model_type == "cnn-lstm":
+                model = CNN_LSTM(config, num_sample_pts, classes).to(device)
             model.load_state_dict(torch.load(model_root + "model_"+str(num_models)+".pth"))
         #Evaluate
         GE, NTGE = evaluate(device, model, X_attack, plt_attack, correct_key,leakage_fn=leakage_fn, nb_attacks=100, total_nb_traces_attacks=2000, nb_traces_attacks=1700)
